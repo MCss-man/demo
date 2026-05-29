@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitHub PR Diff Tool</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+        .card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            padding: 30px;
+            margin-bottom: 20px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #333;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.3s;
+        }
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .checkbox-group input[type="checkbox"] {
+            width: auto;
+            margin: 0;
+        }
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 14px 32px;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .result {
+            margin-top: 30px;
+        }
+        .result h3 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+        .diff-container {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            border-radius: 8px;
+            overflow-x: auto;
+            max-height: 500px;
+            overflow-y: auto;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        .diff-container .line {
+            white-space: pre;
+        }
+        .diff-container .add {
+            color: #4ec9b0;
+        }
+        .diff-container .remove {
+            color: #f14c4c;
+        }
+        .diff-container .header {
+            color: #569cd6;
+        }
+        .diff-container .info {
+            color: #cdcdcd;
+        }
+        .error-message {
+            background: #ffebee;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #fff;
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 0.8s linear infinite;
+            margin-right: 10px;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .api-link {
+            display: inline-block;
+            margin-top: 10px;
+            color: #667eea;
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+        .api-link:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>GitHub PR Diff Tool</h1>
+            <p>获取 GitHub Pull Request 的 diff 内容</p>
+        </div>
+
+        <div class="card">
+            <h2 style="margin-bottom: 25px; color: #333;">输入 PR 信息</h2>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label>仓库所有者 (Owner)</label>
+                    <input type="text" id="owner" placeholder="例如: tiangolo" value="python">
+                </div>
+                <div class="form-group">
+                    <label>仓库名称 (Repo)</label>
+                    <input type="text" id="repo" placeholder="例如: fastapi" value="cpython">
+                </div>
+                <div class="form-group">
+                    <label>PR 编号 (PR Number)</label>
+                    <input type="number" id="prNumber" placeholder="例如: 1000" value="1">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>GitHub Token (可选)</label>
+                <input type="password" id="token" placeholder="ghp_xxx... (私有仓库需要)">
+                <small style="color: #666; display: block; margin-top: 5px;">公共仓库无需 Token，但有请求频率限制</small>
+            </div>
+
+            <div class="form-group checkbox-group">
+                <input type="checkbox" id="skipSsl">
+                <label for="skipSsl">跳过 SSL 证书验证 (Skip SSL)</label>
+            </div>
+
+            <button class="btn" onclick="fetchDiff()">
+                <span class="loading" id="loading" style="display: none;"></span>
+                获取 Diff
+            </button>
+
+            <a href="/docs" class="api-link" target="_blank">查看 API 文档 (Swagger UI)</a>
+        </div>
+
+        <div class="card result" id="result" style="display: none;">
+            <h3>Diff 结果</h3>
+            <div class="diff-container" id="diffContent"></div>
+        </div>
+    </div>
+
+    <script>
+        async function fetchDiff() {
+            const owner = document.getElementById('owner').value.trim();
+            const repo = document.getElementById('repo').value.trim();
+            const prNumber = document.getElementById('prNumber').value.trim();
+            const token = document.getElementById('token').value.trim();
+            const skipSsl = document.getElementById('skipSsl').checked;
+
+            if (!owner || !repo || !prNumber) {
+                alert('请填写完整的 PR 信息');
+                return;
+            }
+
+            const loading = document.getElementById('loading');
+            const btn = document.querySelector('.btn');
+            const result = document.getElementById('result');
+            const diffContent = document.getElementById('diffContent');
+
+            loading.style.display = 'inline-block';
+            btn.disabled = true;
+            result.style.display = 'none';
+
+            try {
+                const params = new URLSearchParams();
+                if (token) params.append('token', token);
+                if (skipSsl) params.append('skip_ssl', 'true');
+
+                const response = await fetch(`/pr/${owner}/${repo}/${prNumber}?${params}`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP 错误: ${response.status}`);
+                }
+
+                const data = await response.json();
+                displayDiff(data.diff);
+                result.style.display = 'block';
+            } catch (error) {
+                result.innerHTML = `<div class="error-message">❌ 获取失败: ${error.message}</div>`;
+                result.style.display = 'block';
+            } finally {
+                loading.style.display = 'none';
+                btn.disabled = false;
+            }
+        }
+
+        function displayDiff(diffText) {
+            const diffContent = document.getElementById('diffContent');
+            let html = '';
+            
+            const lines = diffText.split('\n');
+            lines.forEach(line => {
+                let className = 'info';
+                if (line.startsWith('+') && !line.startsWith('+++')) {
+                    className = 'add';
+                } else if (line.startsWith('-') && !line.startsWith('---')) {
+                    className = 'remove';
+                } else if (line.startsWith('diff ') || line.startsWith('index ') || line.startsWith('--- ') || line.startsWith('+++ ')) {
+                    className = 'header';
+                }
+                html += `<div class="line ${className}">${escapeHtml(line) || '&nbsp;'}</div>`;
+            });
+            
+            diffContent.innerHTML = html;
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
