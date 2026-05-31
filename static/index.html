@@ -3,175 +3,874 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GitHub PR Diff Tool</title>
+    <title>AI Code Review</title>
     <style>
+        :root {
+            --bg-primary: #1a1a1a;
+            --bg-secondary: #252525;
+            --bg-tertiary: #2d2d2d;
+            --bg-card: #2a2a2a;
+            --text-primary: #e0e0e0;
+            --text-secondary: #a0a0a0;
+            --text-muted: #707070;
+            --border-color: #3a3a3a;
+            --accent: #74ed71;
+            --accent-hover: #5fd65b;
+            --critical: #ff4757;
+            --high: #ffa502;
+            --medium: #ffdd59;
+            --low: #3742fa;
+            --diff-add: #2ed573;
+            --diff-remove: #ff4757;
+            --shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+
+        .light-theme {
+            --bg-primary: #f5f6fa;
+            --bg-secondary: #ffffff;
+            --bg-tertiary: #f0f1f2;
+            --bg-card: #ffffff;
+            --text-primary: #2f3640;
+            --text-secondary: #5f6c7b;
+            --text-muted: #8c95a1;
+            --border-color: #dcdde1;
+            --shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+
         * {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
         }
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: var(--bg-primary);
+            color: var(--text-primary);
             min-height: 100vh;
-            padding: 20px;
+            line-height: 1.6;
         }
+
+        .navbar {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .navbar-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .navbar-logo {
+            width: 36px;
+            height: 36px;
+            background: var(--accent);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+
+        .navbar-title {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .theme-toggle {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 6px;
+            cursor: pointer;
+            display: flex;
+            gap: 5px;
+        }
+
+        .theme-toggle span {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .theme-toggle .active {
+            background: var(--accent);
+            color: #000;
+        }
+
         .container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
+            padding: 30px 20px;
         }
-        .header {
-            text-align: center;
-            color: white;
-            margin-bottom: 30px;
-        }
-        .header h1 {
-            font-size: 2.5rem;
-            margin-bottom: 10px;
-        }
-        .header p {
-            font-size: 1.1rem;
-            opacity: 0.9;
-        }
+
         .card {
-            background: white;
+            background: var(--bg-card);
             border-radius: 12px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
-            padding: 30px;
+            box-shadow: var(--shadow);
+            padding: 24px;
+            margin-bottom: 24px;
+            border: 1px solid var(--border-color);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             margin-bottom: 20px;
         }
+
+        .card-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
         .form-group {
-            margin-bottom: 20px;
+            margin-bottom: 18px;
         }
+
         .form-group label {
             display: block;
-            font-weight: 600;
+            font-weight: 500;
             margin-bottom: 8px;
-            color: #333;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
         }
-        .form-group input {
+
+        .form-group input,
+        .form-group select {
             width: 100%;
             padding: 12px 16px;
-            border: 2px solid #e0e0e0;
+            border: 1px solid var(--border-color);
             border-radius: 8px;
-            font-size: 1rem;
-            transition: border-color 0.3s;
+            font-size: 0.95rem;
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            transition: border-color 0.3s, box-shadow 0.3s;
         }
-        .form-group input:focus {
+
+        .form-group input:focus,
+        .form-group select:focus {
             outline: none;
-            border-color: #667eea;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(116, 237, 113, 0.15);
         }
+
+        .form-group input::placeholder {
+            color: var(--text-muted);
+        }
+
         .form-row {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
             gap: 20px;
         }
+
+        .form-row-3 {
+            grid-template-columns: repeat(3, 1fr);
+        }
+
+        @media (max-width: 768px) {
+            .form-row-3 {
+                grid-template-columns: 1fr;
+            }
+        }
+
         .checkbox-group {
             display: flex;
             align-items: center;
             gap: 10px;
+            padding: 12px 0;
         }
+
         .checkbox-group input[type="checkbox"] {
-            width: auto;
-            margin: 0;
+            width: 18px;
+            height: 18px;
+            accent-color: var(--accent);
         }
+
+        .checkbox-group label {
+            margin: 0;
+            cursor: pointer;
+        }
+
         .btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+            background: var(--accent);
+            color: #000;
             border: none;
             padding: 14px 32px;
             border-radius: 8px;
-            font-size: 1.1rem;
+            font-size: 1rem;
             font-weight: 600;
             cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
         }
+
         .btn:hover {
+            background: var(--accent-hover);
             transform: translateY(-2px);
-            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 5px 20px rgba(116, 237, 113, 0.3);
         }
+
         .btn:disabled {
             opacity: 0.6;
             cursor: not-allowed;
             transform: none;
         }
-        .result {
-            margin-top: 30px;
+
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
         }
-        .result h3 {
-            margin-bottom: 15px;
-            color: #333;
+
+        .btn-secondary:hover {
+            background: var(--border-color);
         }
-        .diff-container {
-            background: #1e1e1e;
-            color: #d4d4d4;
-            padding: 20px;
-            border-radius: 8px;
-            overflow-x: auto;
-            max-height: 500px;
-            overflow-y: auto;
-            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-            font-size: 13px;
-            line-height: 1.5;
+
+        .btn-sm {
+            padding: 8px 16px;
+            font-size: 0.85rem;
         }
-        .diff-container .line {
-            white-space: pre;
-        }
-        .diff-container .add {
-            color: #4ec9b0;
-        }
-        .diff-container .remove {
-            color: #f14c4c;
-        }
-        .diff-container .header {
-            color: #569cd6;
-        }
-        .diff-container .info {
-            color: #cdcdcd;
-        }
-        .error-message {
-            background: #ffebee;
-            color: #c62828;
-            padding: 15px;
-            border-radius: 8px;
-            margin-top: 15px;
-        }
-        .loading {
-            display: inline-block;
+
+        .loading-spinner {
             width: 20px;
             height: 20px;
-            border: 2px solid #fff;
+            border: 2px solid var(--text-muted);
             border-radius: 50%;
-            border-top-color: transparent;
+            border-top-color: var(--accent);
             animation: spin 0.8s linear infinite;
-            margin-right: 10px;
         }
+
+        .progress-container {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+
+        .progress-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .progress-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .progress-status {
+            font-size: 14px;
+            color: var(--accent);
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .progress-steps {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .progress-step {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px;
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+            transition: all 0.3s;
+        }
+
+        .progress-step.active {
+            background: rgba(116, 237, 113, 0.1);
+            border: 1px solid var(--accent);
+        }
+
+        .progress-step.completed {
+            background: rgba(116, 237, 113, 0.15);
+            border: 1px solid var(--accent);
+        }
+
+        .progress-step.error {
+            background: rgba(255, 71, 87, 0.1);
+            border: 1px solid var(--critical);
+        }
+
+        .step-icon {
+            font-size: 20px;
+        }
+
+        .step-name {
+            flex: 1;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .step-status {
+            font-size: 12px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            background: var(--text-muted);
+            color: var(--bg-primary);
+        }
+
+        .step-status.pending {
+            background: var(--text-muted);
+        }
+
+        .step-status.active {
+            background: var(--accent);
+            animation: pulse 1s infinite;
+        }
+
+        .step-status.completed {
+            background: var(--accent);
+        }
+
+        .step-status.error {
+            background: var(--critical);
+        }
+
+        .progress-bar {
+            height: 6px;
+            background: var(--bg-tertiary);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent), #5fd65b);
+            border-radius: 3px;
+            transition: width 0.5s ease;
+        }
+
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
+
+        .error-message {
+            background: rgba(255, 71, 87, 0.1);
+            border: 1px solid var(--critical);
+            color: var(--critical);
+            padding: 16px;
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: var(--bg-tertiary);
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            border: 1px solid var(--border-color);
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        .stat-label {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-top: 5px;
+        }
+
+        .stat-card.critical .stat-value { color: var(--critical); }
+        .stat-card.high .stat-value { color: var(--high); }
+        .stat-card.medium .stat-value { color: var(--medium); }
+        .stat-card.low .stat-value { color: var(--low); }
+
+        .heatmap {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding: 16px;
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+        }
+
+        .heatmap-item {
+            padding: 8px 14px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: transform 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .heatmap-item:hover {
+            transform: scale(1.05);
+        }
+
+        .heatmap-item.critical { background: rgba(255, 71, 87, 0.2); border: 1px solid var(--critical); color: var(--critical); }
+        .heatmap-item.high { background: rgba(255, 165, 2, 0.2); border: 1px solid var(--high); color: var(--high); }
+        .heatmap-item.medium { background: rgba(255, 221, 89, 0.2); border: 1px solid var(--medium); color: var(--medium); }
+        .heatmap-item.low { background: rgba(55, 66, 250, 0.2); border: 1px solid var(--low); color: var(--low); }
+        .heatmap-item.safe { background: rgba(46, 213, 115, 0.2); border: 1px solid var(--diff-add); color: var(--diff-add); }
+
+        .heatmap-label {
+            font-size: 0.75rem;
+            opacity: 0.8;
+        }
+
+        .risk-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .risk-card {
+            background: var(--bg-tertiary);
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+            transition: all 0.3s;
+        }
+
+        .risk-card:hover {
+            border-color: var(--text-muted);
+        }
+
+        .risk-card-header {
+            padding: 16px;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            cursor: pointer;
+        }
+
+        .risk-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+
+        .risk-icon.critical { background: rgba(255, 71, 87, 0.15); }
+        .risk-icon.high { background: rgba(255, 165, 2, 0.15); }
+        .risk-icon.medium { background: rgba(255, 221, 89, 0.15); }
+        .risk-icon.low { background: rgba(55, 66, 250, 0.15); }
+
+        .risk-info {
+            flex: 1;
+        }
+
+        .risk-title {
+            font-weight: 600;
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .risk-severity {
+            font-size: 0.75rem;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .risk-severity.critical { background: var(--critical); color: #fff; }
+        .risk-severity.high { background: var(--high); color: #000; }
+        .risk-severity.medium { background: var(--medium); color: #000; }
+        .risk-severity.low { background: var(--low); color: #fff; }
+
+        .risk-description {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            margin-bottom: 8px;
+        }
+
+        .risk-meta {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .risk-meta span {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .risk-details {
+            padding: 0 16px 16px 64px;
+            display: none;
+        }
+
+        .risk-card.expanded .risk-details {
+            display: block;
+        }
+
+        .risk-details-content {
+            background: var(--bg-primary);
+            border-radius: 8px;
+            padding: 16px;
+            margin-top: 12px;
+        }
+
+        .risk-details-title {
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: var(--accent);
+        }
+
+        .file-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .file-item {
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+            margin-bottom: 8px;
+        }
+
+        .file-item summary {
+            padding: 14px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            transition: background 0.2s;
+            list-style: none;
+        }
+
+        .file-item summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .file-item summary:hover {
+            background: var(--border-color);
+        }
+
+        .file-name {
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .file-icon {
+            color: var(--text-muted);
+        }
+
+        .file-stats {
+            display: flex;
+            gap: 12px;
+            font-size: 0.85rem;
+        }
+
+        .file-stat-add {
+            color: var(--diff-add);
+        }
+
+        .file-stat-remove {
+            color: var(--diff-remove);
+        }
+
+        .file-toggle {
+            transition: transform 0.3s;
+            color: var(--text-muted);
+        }
+
+        details[open] > summary .file-toggle {
+            transform: rotate(180deg);
+        }
+
+        .file-content {
+            display: none;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .file-item.expanded .file-content {
+            display: block;
+        }
+
+        .diff-container {
+            background: var(--bg-primary);
+            padding: 16px;
+            overflow-x: auto;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 13px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .diff-line {
+            white-space: pre;
+            padding: 2px 8px;
+            border-radius: 3px;
+        }
+
+        .diff-line.add {
+            background: rgba(46, 213, 115, 0.1);
+            color: var(--diff-add);
+        }
+
+        .diff-line.remove {
+            background: rgba(255, 71, 87, 0.1);
+            color: var(--diff-remove);
+        }
+
+        .diff-line.header {
+            color: #569cd6;
+        }
+
+        .diff-line.info {
+            color: var(--text-muted);
+        }
+
+        .file-analysis {
+            padding: 16px;
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border-color);
+        }
+
+        .analysis-section {
+            margin-bottom: 16px;
+        }
+
+        .analysis-section:last-child {
+            margin-bottom: 0;
+        }
+
+        .analysis-title {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .analysis-content {
+            font-size: 0.9rem;
+            line-height: 1.7;
+        }
+
+        .summary-section {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .summary-card {
+            background: var(--bg-tertiary);
+            border-radius: 10px;
+            padding: 20px;
+            border: 1px solid var(--border-color);
+        }
+
+        .summary-label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        .summary-value {
+            font-size: 1rem;
+            color: var(--text-primary);
+        }
+
+        .filter-bar {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+            padding: 16px;
+            background: var(--bg-tertiary);
+            border-radius: 10px;
+        }
+
+        .filter-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .filter-label {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .filter-select {
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-size: 0.85rem;
+        }
+
+        .context-section {
+            margin-top: 24px;
+        }
+
+        .context-card {
+            background: var(--bg-tertiary);
+            border-radius: 10px;
+            padding: 20px;
+            border-left: 4px solid var(--accent);
+        }
+
+        .context-title {
+            font-weight: 600;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .context-content {
+            font-size: 0.9rem;
+            line-height: 1.7;
+            color: var(--text-secondary);
+        }
+
+        .result-section {
+            display: none;
+        }
+
+        .result-section.active {
+            display: block;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-muted);
+        }
+
+        .empty-state-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        .confidence-badge {
+            font-size: 0.75rem;
+            padding: 2px 8px;
+            border-radius: 4px;
+            background: var(--bg-secondary);
+            color: var(--text-muted);
+            border: 1px solid var(--border-color);
+        }
+
         .api-link {
             display: inline-block;
-            margin-top: 10px;
-            color: #667eea;
+            margin-left: 20px;
+            color: var(--accent);
             text-decoration: none;
             font-size: 0.9rem;
         }
+
         .api-link:hover {
             text-decoration: underline;
+        }
+
+        @media (max-width: 768px) {
+            .navbar {
+                padding: 12px 16px;
+            }
+
+            .container {
+                padding: 20px 16px;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .filter-bar {
+                flex-direction: column;
+            }
+
+            .filter-group {
+                width: 100%;
+            }
+
+            .filter-select {
+                flex: 1;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>GitHub PR Diff Tool</h1>
-            <p>获取 GitHub Pull Request 的 diff 内容</p>
+    <nav class="navbar">
+        <div class="navbar-brand">
+            <div class="navbar-logo">🤖</div>
+            <span class="navbar-title">AI Code Review</span>
         </div>
+        <div class="theme-toggle">
+            <span id="darkMode" class="active" onclick="setTheme('dark')">🌙</span>
+            <span id="lightMode" onclick="setTheme('light')">☀️</span>
+        </div>
+    </nav>
 
+    <div class="container">
         <div class="card">
-            <h2 style="margin-bottom: 25px; color: #333;">输入 PR 信息</h2>
-            
-            <div class="form-row">
+            <div class="card-header">
+                <h2 class="card-title">📥 输入 PR 信息</h2>
+            </div>
+
+            <div class="form-row form-row-3">
                 <div class="form-group">
                     <label>仓库所有者 (Owner)</label>
                     <input type="text" id="owner" placeholder="例如: tiangolo" value="python">
@@ -186,82 +885,570 @@
                 </div>
             </div>
 
-            <div class="form-group">
-                <label>GitHub Token (可选)</label>
-                <input type="password" id="token" placeholder="ghp_xxx... (私有仓库需要)">
-                <small style="color: #666; display: block; margin-top: 5px;">公共仓库无需 Token，但有请求频率限制</small>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>GitHub Token (可选)</label>
+                    <input type="password" id="token" placeholder="ghp_xxx... (私有仓库需要)">
+                </div>
+                <div class="form-group">
+                    <label>LLM Key (可选)</label>
+                    <input type="password" id="llmKey" placeholder="sk-xxx... (用于 AI 分析)">
+                </div>
+                <div class="form-group">
+                    <label>最低置信度</label>
+                    <select id="minConfidence">
+                        <option value="low">全部</option>
+                        <option value="medium" selected>Medium 及以上</option>
+                        <option value="high">High 及以上</option>
+                    </select>
+                </div>
             </div>
 
-            <div class="form-group checkbox-group">
+            <div class="checkbox-group">
                 <input type="checkbox" id="skipSsl">
                 <label for="skipSsl">跳过 SSL 证书验证 (Skip SSL)</label>
             </div>
 
-            <button class="btn" onclick="fetchDiff()">
-                <span class="loading" id="loading" style="display: none;"></span>
-                获取 Diff
+            <button class="btn" onclick="startReview()">
+                <span class="loading-spinner" id="loading" style="display: none;"></span>
+                开始评审
             </button>
 
-            <a href="/docs" class="api-link" target="_blank">查看 API 文档 (Swagger UI)</a>
+            <a href="/docs" class="api-link" target="_blank">查看 API 文档</a>
         </div>
 
-        <div class="card result" id="result" style="display: none;">
-            <h3>Diff 结果</h3>
-            <div class="diff-container" id="diffContent"></div>
+        <div id="resultSection" class="result-section">
+            <div class="error-container" id="errorContainer" style="display: none;"></div>
+
+            <div id="reviewContent">
+                <div id="progressContainer" class="progress-container" style="display: none;">
+                    <div class="progress-header">
+                        <div class="progress-title">⚙️ 正在分析中...</div>
+                        <div class="progress-status" id="progressStatus">准备中</div>
+                    </div>
+                    <div class="progress-steps" id="progressSteps">
+                        <div class="progress-step" data-step="statistics">
+                            <span class="step-icon">📊</span>
+                            <span class="step-name">统计信息</span>
+                            <span class="step-status">pending</span>
+                        </div>
+                        <div class="progress-step" data-step="overview">
+                            <span class="step-icon">📋</span>
+                            <span class="step-name">概览分析</span>
+                            <span class="step-status">pending</span>
+                        </div>
+                        <div class="progress-step" data-step="files">
+                            <span class="step-icon">📄</span>
+                            <span class="step-name">文件分析</span>
+                            <span class="step-status">pending</span>
+                        </div>
+                        <div class="progress-step" data-step="risks">
+                            <span class="step-icon">⚠️</span>
+                            <span class="step-name">风险检测</span>
+                            <span class="step-status">pending</span>
+                        </div>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">📊 概览</h3>
+                    </div>
+                    <div class="stats-grid" id="statsGrid"></div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">🔥 风险热力图</h3>
+                    </div>
+                    <div class="heatmap" id="heatmap"></div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">📝 PR 摘要</h3>
+                    </div>
+                    <div class="summary-section" id="summarySection"></div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">⚠️ 风险列表</h3>
+                    </div>
+                    <div class="filter-bar">
+                        <div class="filter-group">
+                            <span class="filter-label">风险类型:</span>
+                            <select class="filter-select" id="filterType" onchange="filterRisks()">
+                                <option value="all">全部</option>
+                                <option value="security">安全</option>
+                                <option value="performance">性能</option>
+                                <option value="code_quality">代码质量</option>
+                                <option value="bug">潜在 Bug</option>
+                                <option value="best_practice">最佳实践</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <span class="filter-label">置信度:</span>
+                            <select class="filter-select" id="filterConfidence" onchange="filterRisks()">
+                                <option value="all">全部</option>
+                                <option value="high">High</option>
+                                <option value="medium">Medium</option>
+                                <option value="low">Low</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="risk-list" id="riskList"></div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">📁 修改文件</h3>
+                    </div>
+                    <div class="file-list" id="fileList"></div>
+                </div>
+
+                <div class="context-section" id="contextSection" style="display: none;">
+                    <div class="card">
+                        <div class="context-card">
+                            <div class="context-title">🔗 上下文分析</div>
+                            <div class="context-content" id="contextContent"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="emptyState" class="empty-state">
+            <div class="empty-state-icon">📂</div>
+            <p>输入 PR 信息并点击"开始评审"查看分析结果</p>
         </div>
     </div>
 
     <script>
-        async function fetchDiff() {
+        let reviewData = null;
+
+        function setTheme(theme) {
+            if (theme === 'light') {
+                document.body.classList.add('light-theme');
+                document.getElementById('darkMode').classList.remove('active');
+                document.getElementById('lightMode').classList.add('active');
+            } else {
+                document.body.classList.remove('light-theme');
+                document.getElementById('darkMode').classList.add('active');
+                document.getElementById('lightMode').classList.remove('active');
+            }
+        }
+
+        async function startReview() {
             const owner = document.getElementById('owner').value.trim();
             const repo = document.getElementById('repo').value.trim();
             const prNumber = document.getElementById('prNumber').value.trim();
             const token = document.getElementById('token').value.trim();
+            const llmKey = document.getElementById('llmKey').value.trim();
             const skipSsl = document.getElementById('skipSsl').checked;
+            const minConfidence = document.getElementById('minConfidence').value;
 
             if (!owner || !repo || !prNumber) {
-                alert('请填写完整的 PR 信息');
+                showError('请填写完整的 PR 信息');
                 return;
             }
 
             const loading = document.getElementById('loading');
             const btn = document.querySelector('.btn');
-            const result = document.getElementById('result');
-            const diffContent = document.getElementById('diffContent');
+            const resultSection = document.getElementById('resultSection');
+            const emptyState = document.getElementById('emptyState');
+            const errorContainer = document.getElementById('errorContainer');
+            const progressContainer = document.getElementById('progressContainer');
 
             loading.style.display = 'inline-block';
             btn.disabled = true;
-            result.style.display = 'none';
+            resultSection.classList.add('active');
+            emptyState.style.display = 'none';
+            errorContainer.style.display = 'none';
+            document.getElementById('reviewContent').style.display = 'block';
+            progressContainer.style.display = 'block';
+
+            resetProgress();
 
             try {
                 const params = new URLSearchParams();
                 if (token) params.append('token', token);
+                if (llmKey) params.append('llm_key', llmKey);
                 if (skipSsl) params.append('skip_ssl', 'true');
+                if (minConfidence) params.append('min_confidence', minConfidence);
 
-                const response = await fetch(`/pr/${owner}/${repo}/${prNumber}?${params}`);
-                
+                const response = await fetch(`/pr/${owner}/${repo}/${prNumber}/review/stream?${params}`);
+
                 if (!response.ok) {
-                    throw new Error(`HTTP 错误: ${response.status}`);
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || `HTTP 错误: ${response.status}`);
                 }
 
-                const data = await response.json();
-                displayDiff(data.diff);
-                result.style.display = 'block';
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop();
+
+                    for (const line of lines) {
+                        if (line.trim()) {
+                            try {
+                                const data = JSON.parse(line);
+                                handleStreamEvent(data);
+                            } catch (e) {
+                                console.warn('解析 SSE 数据失败:', e);
+                            }
+                        }
+                    }
+                }
+
+                if (buffer.trim()) {
+                    try {
+                        const data = JSON.parse(buffer.trim());
+                        handleStreamEvent(data);
+                    } catch (e) {
+                        console.warn('解析最后一条数据失败:', e);
+                    }
+                }
+
             } catch (error) {
-                result.innerHTML = `<div class="error-message">❌ 获取失败: ${error.message}</div>`;
-                result.style.display = 'block';
+                showError('获取失败: ' + error.message);
+                document.getElementById('reviewContent').style.display = 'none';
+                progressContainer.style.display = 'none';
             } finally {
                 loading.style.display = 'none';
                 btn.disabled = false;
             }
         }
 
-        function displayDiff(diffText) {
-            const diffContent = document.getElementById('diffContent');
-            let html = '';
-            
+        function resetProgress() {
+            const steps = document.querySelectorAll('.progress-step');
+            steps.forEach(step => {
+                step.classList.remove('active', 'completed', 'error');
+                const status = step.querySelector('.step-status');
+                status.className = 'step-status pending';
+                status.textContent = '等待中';
+            });
+            document.getElementById('progressFill').style.width = '0%';
+            document.getElementById('progressStatus').textContent = '准备中';
+        }
+
+        function updateProgressStep(stepName, status) {
+            const step = document.querySelector(`.progress-step[data-step="${stepName}"]`);
+            if (!step) return;
+
+            const statusEl = step.querySelector('.step-status');
+
+            if (status === 'active') {
+                step.classList.add('active');
+                step.classList.remove('completed', 'error');
+                statusEl.className = 'step-status active';
+                statusEl.textContent = '分析中';
+            } else if (status === 'completed') {
+                step.classList.remove('active');
+                step.classList.add('completed');
+                statusEl.className = 'step-status completed';
+                statusEl.textContent = '完成';
+            } else if (status === 'error') {
+                step.classList.remove('active', 'completed');
+                step.classList.add('error');
+                statusEl.className = 'step-status error';
+                statusEl.textContent = '失败';
+            }
+
+            updateProgressBar();
+        }
+
+        function updateProgressBar() {
+            const steps = document.querySelectorAll('.progress-step');
+            const completed = document.querySelectorAll('.progress-step.completed').length;
+            const percentage = (completed / steps.length) * 100;
+            document.getElementById('progressFill').style.width = percentage + '%';
+        }
+
+        function handleStreamEvent(data) {
+            const progressContainer = document.getElementById('progressContainer');
+            const progressStatus = document.getElementById('progressStatus');
+
+            if (data.status === 'start') {
+                progressStatus.textContent = data.message || '开始分析...';
+                updateProgressStep('statistics', 'active');
+            } else if (data.status === 'progress') {
+                progressStatus.textContent = data.message || `${data.step} 分析中...`;
+                updateProgressStep(data.step, 'completed');
+
+                if (data.step === 'statistics' && data.data) {
+                    renderStats(data.data, {});
+                }
+            } else if (data.status === 'complete') {
+                progressStatus.textContent = '分析完成！';
+                document.getElementById('progressFill').style.width = '100%';
+                progressContainer.style.display = 'none';
+
+                reviewData = data.data;
+                renderReview(reviewData);
+            } else if (data.status === 'error') {
+                if (data.step) {
+                    updateProgressStep(data.step, 'error');
+                    progressStatus.textContent = data.message;
+                }
+            }
+        }
+
+        function showError(message) {
+            const errorContainer = document.getElementById('errorContainer');
+            const resultSection = document.getElementById('resultSection');
+            const reviewContent = document.getElementById('reviewContent');
+            const emptyState = document.getElementById('emptyState');
+
+            errorContainer.innerHTML = `<div class="error-message">❌ ${escapeHtml(message)}</div>`;
+            errorContainer.style.display = 'block';
+            resultSection.classList.add('active');
+            reviewContent.style.display = 'none';
+            emptyState.style.display = 'none';
+        }
+
+        function renderReview(data) {
+            renderStats(data.overview, data.overview_risk_summary);
+            renderHeatmap(data.file_details || data.files);
+            renderSummary(data.summary);
+            renderRiskList(data.risks);
+            renderFileList(data.file_details || data.files);
+            renderContext(data.context);
+        }
+
+        function renderStats(overview, riskSummary) {
+            const statsGrid = document.getElementById('statsGrid');
+            statsGrid.innerHTML = `
+                <div class="stat-card">
+                    <div class="stat-value">${overview?.files_changed || 0}</div>
+                    <div class="stat-label">修改文件数</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">+${overview?.lines_added || 0}</div>
+                    <div class="stat-label">新增行数</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">-${overview?.lines_removed || 0}</div>
+                    <div class="stat-label">删除行数</div>
+                </div>
+                <div class="stat-card critical">
+                    <div class="stat-value">${riskSummary?.critical || 0}</div>
+                    <div class="stat-label">Critical 风险</div>
+                </div>
+                <div class="stat-card high">
+                    <div class="stat-value">${riskSummary?.high || 0}</div>
+                    <div class="stat-label">High 风险</div>
+                </div>
+                <div class="stat-card medium">
+                    <div class="stat-value">${riskSummary?.medium || 0}</div>
+                    <div class="stat-label">Medium 风险</div>
+                </div>
+                <div class="stat-card low">
+                    <div class="stat-value">${riskSummary?.low || 0}</div>
+                    <div class="stat-label">Low 风险</div>
+                </div>
+            `;
+        }
+
+        function renderHeatmap(files) {
+            const heatmap = document.getElementById('heatmap');
+            if (!files || files.length === 0) {
+                heatmap.innerHTML = '<div class="empty-state" style="padding: 20px;">无修改文件</div>';
+                return;
+            }
+
+            heatmap.innerHTML = files.map(file => {
+                const riskLevel = file.risk_level || 'safe';
+                const riskCount = file.risk_count || 0;
+                const filename = file.filename.split('/').pop();
+                return `
+                    <div class="heatmap-item ${riskLevel}" onclick="scrollToFile('${file.filename}')">
+                        <span>${escapeHtml(filename)}</span>
+                        ${riskCount > 0 ? `<span class="heatmap-label">${riskCount} 个风险</span>` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderSummary(summary) {
+            const summarySection = document.getElementById('summarySection');
+            if (!summary || summary.error) {
+                summarySection.innerHTML = '<div class="empty-state" style="padding: 20px;">⚠️ AI 分析暂时不可用（API 密钥无效或账户问题），但可以查看 Diff 内容</div>';
+                return;
+            }
+            const keyChanges = Array.isArray(summary.key_changes) ? summary.key_changes.join('；') : (typeof summary.key_changes === 'string' ? summary.key_changes : '');
+            summarySection.innerHTML = `
+                <div class="summary-card">
+                    <div class="summary-label">PR 标题</div>
+                    <div class="summary-value">${escapeHtml(summary?.title || '无')}</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-label">修改摘要</div>
+                    <div class="summary-value">${escapeHtml(summary?.changes_summary || summary?.description || '无')}</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-label">关键变更点</div>
+                    <div class="summary-value">${escapeHtml(keyChanges || '无')}</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-label">风险评估</div>
+                    <div class="summary-value">${escapeHtml(summary?.risk_assessment || '无')}</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-label">整体建议</div>
+                    <div class="summary-value">${escapeHtml(summary?.overall_suggestion || summary?.recommendation || '无')}</div>
+                </div>
+            `;
+        }
+
+        function renderRiskList(risks) {
+            const riskList = document.getElementById('riskList');
+            if (!risks || risks.length === 0) {
+                riskList.innerHTML = '<div class="empty-state" style="padding: 40px;">🎉 未检测到风险</div>';
+                return;
+            }
+
+            const severityOrder = { 'critical': 0, 'high': 1, 'medium': 2, 'low': 3 };
+            const sortedRisks = [...risks].sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]);
+
+            riskList.innerHTML = sortedRisks.map((risk, index) => `
+                <div class="risk-card" data-type="${risk.type}" data-confidence="${risk.confidence}" onclick="toggleRiskCard(this)">
+                    <div class="risk-card-header">
+                        <div class="risk-icon ${risk.severity}">
+                            ${getRiskIcon(risk.type)}
+                        </div>
+                        <div class="risk-info">
+                            <div class="risk-title">
+                                ${escapeHtml(risk.title)}
+                                <span class="risk-severity ${risk.severity}">${risk.severity}</span>
+                            </div>
+                            <div class="risk-description">${escapeHtml(risk.description)}</div>
+                            <div class="risk-meta">
+                                <span>📍 ${escapeHtml(risk.file || risk.location?.file || '未知')}:${risk.line_start || risk.location?.line || '?'}${risk.line_end ? '-' + risk.line_end : ''}</span>
+                                <span>📊 置信度: ${risk.confidence}</span>
+                                <span>🏷️ 类型: ${risk.type}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="risk-details">
+                        <div class="risk-details-content">
+                            ${risk.function_name ? `<div class="risk-details-title">📌 所在函数/类</div><div>${escapeHtml(risk.function_name)}</div>` : ''}
+                            ${risk.code_context ? `<div class="risk-details-title">📝 风险代码</div><div style="background: #2d2d2d; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 12px; overflow-x: auto;">${escapeHtml(risk.code_context)}</div>` : ''}
+                            <div class="risk-details-title">💡 建议</div>
+                            <div>${escapeHtml(risk.suggestion || '无具体建议')}</div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function getRiskIcon(type) {
+            const icons = {
+                'security': '🔒',
+                'performance': '⚡',
+                'code_quality': '📝',
+                'bug': '🐛',
+                'best_practice': '✨'
+            };
+            return icons[type] || '⚠️';
+        }
+
+        function toggleRiskCard(card) {
+            card.classList.toggle('expanded');
+        }
+
+        function filterRisks() {
+            const typeFilter = document.getElementById('filterType').value;
+            const confidenceFilter = document.getElementById('filterConfidence').value;
+            const riskCards = document.querySelectorAll('.risk-card');
+
+            riskCards.forEach(card => {
+                const cardType = card.dataset.type;
+                const cardConfidence = card.dataset.confidence;
+
+                const typeMatch = typeFilter === 'all' || cardType === typeFilter;
+                const confidenceMatch = confidenceFilter === 'all' || cardConfidence === confidenceFilter;
+
+                if (typeMatch && confidenceMatch) {
+                    card.style.display = '';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        }
+
+        function renderFileList(files) {
+            const fileList = document.getElementById('fileList');
+            if (!files || files.length === 0) {
+                fileList.innerHTML = '<div class="empty-state" style="padding: 40px;">无修改文件</div>';
+                return;
+            }
+
+            fileList.innerHTML = files.map((file, index) => {
+                const fileDiff = file.diff || '';
+                const suggestions = file.suggestions || [];
+                const fileSummary = file.summary || '无';
+                const fileSuggestion = file.file_suggestion || '';
+                
+                return `
+                    <details class="file-item" id="file-${index}">
+                        <summary class="file-header">
+                            <div class="file-name">
+                                <span class="file-icon">📄</span>
+                                <span>${escapeHtml(file.filename)}</span>
+                            </div>
+                            <div class="file-stats">
+                                ${suggestions.length > 0 ? `<span class="risk-severity medium">${suggestions.length} 个建议</span>` : ''}
+                                <span class="file-toggle">▼</span>
+                            </div>
+                        </summary>
+                        <div class="file-content">
+                            <div class="file-analysis">
+                                <div class="analysis-section">
+                                    <div class="analysis-title">📝 文件修改总结</div>
+                                    <div class="analysis-content">${escapeHtml(fileSummary)}</div>
+                                </div>
+                                ${suggestions.length > 0 ? `
+                                    <div class="analysis-section">
+                                        <div class="analysis-title">⚠️ 该文件的风险点列表</div>
+                                        <div class="analysis-content">
+                                            ${suggestions.map(suggestion => `
+                                                <div style="margin-bottom: 12px; padding: 10px; background: var(--bg-primary); border-radius: 6px; border-left: 3px solid var(--medium);">
+                                                    <div>${escapeHtml(suggestion)}</div>
+                                                </div>
+                                            `).join('')}
+                                        </div>
+                                    </div>
+                                ` : ''}
+                                ${fileSuggestion ? `
+                                    <div class="analysis-section">
+                                        <div class="analysis-title">💡 文件级建议</div>
+                                        <div class="analysis-content" style="color: var(--accent);">${escapeHtml(fileSuggestion)}</div>
+                                    </div>
+                                ` : ''}
+                            </div>
+                            <div class="diff-container">${renderDiff(fileDiff)}</div>
+                        </div>
+                    </details>
+                `;
+            }).join('');
+        }
+
+        function renderDiff(diffText) {
+            if (!diffText) return '<div style="padding: 20px; color: var(--text-muted);">无 Diff 内容</div>';
+
             const lines = diffText.split('\n');
-            lines.forEach(line => {
+            return lines.map(line => {
                 let className = 'info';
                 if (line.startsWith('+') && !line.startsWith('+++')) {
                     className = 'add';
@@ -270,10 +1457,52 @@
                 } else if (line.startsWith('diff ') || line.startsWith('index ') || line.startsWith('--- ') || line.startsWith('+++ ')) {
                     className = 'header';
                 }
-                html += `<div class="line ${className}">${escapeHtml(line) || '&nbsp;'}</div>`;
+                return `<div class="diff-line ${className}">${escapeHtml(line) || '&nbsp;'}</div>`;
+            }).join('');
+        }
+
+        function toggleFile(item) {
+            item.classList.toggle('expanded');
+        }
+
+        function scrollToFile(filename) {
+            const fileItems = document.querySelectorAll('.file-item');
+            fileItems.forEach((item, index) => {
+                const fileName = item.querySelector('.file-name span:last-child').textContent;
+                if (fileName === filename || fileName.endsWith(filename.split('/').pop())) {
+                    item.classList.add('expanded');
+                    item.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
             });
-            
-            diffContent.innerHTML = html;
+        }
+
+        function renderContext(context) {
+            const contextSection = document.getElementById('contextSection');
+            const contextContent = document.getElementById('contextContent');
+
+            if (!context || (!context.cross_file_impacts?.length && !context.potential_issues?.length)) {
+                contextSection.style.display = 'none';
+                return;
+            }
+
+            contextSection.style.display = 'block';
+            let html = '';
+
+            if (context.cross_file_impacts?.length) {
+                html += '<div style="margin-bottom: 16px;"><strong>跨文件影响:</strong></div>';
+                html += '<ul style="margin-left: 20px; margin-bottom: 16px;">';
+                html += context.cross_file_impacts.map(impact => `<li>${escapeHtml(impact)}</li>`).join('');
+                html += '</ul>';
+            }
+
+            if (context.potential_issues?.length) {
+                html += '<div style="margin-bottom: 16px;"><strong>潜在问题:</strong></div>';
+                html += '<ul style="margin-left: 20px;">';
+                html += context.potential_issues.map(issue => `<li>${escapeHtml(issue)}</li>`).join('');
+                html += '</ul>';
+            }
+
+            contextContent.innerHTML = html;
         }
 
         function escapeHtml(text) {

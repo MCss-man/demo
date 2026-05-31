@@ -31,3 +31,25 @@ class GitHubClient:
             response = client.get(url)
             response.raise_for_status()
             return response.text
+
+    async def get_file_content(self, owner: str, repo: str, file_path: str, ref: str = None) -> str:
+        url = f"{BASE_URL}/repos/{owner}/{repo}/contents/{file_path}"
+        if ref:
+            url += f"?ref={ref}"
+        headers = dict(self.headers)
+        headers["Accept"] = "application/vnd.github.v3.raw"
+        async with httpx.AsyncClient(headers=headers, verify=self.verify_ssl, follow_redirects=True) as client:
+            response = await client.get(url)
+            response.raise_for_status()
+            return response.text
+
+    def get_file_content_sync(self, owner: str, repo: str, file_path: str, ref: str = None) -> str:
+        url = f"{BASE_URL}/repos/{owner}/{repo}/contents/{file_path}"
+        if ref:
+            url += f"?ref={ref}"
+        headers = dict(self.headers)
+        headers["Accept"] = "application/vnd.github.v3.raw"
+        with httpx.Client(headers=headers, verify=self.verify_ssl, follow_redirects=True) as client:
+            response = client.get(url)
+            response.raise_for_status()
+            return response.text
